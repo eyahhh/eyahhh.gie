@@ -1,1 +1,175 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verificador de Links</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f4f4f9;
+            color: #333;
+        }
+        h1 {
+            text-align: center;
+            color: #4A4A4A;
+        }
+        form {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            max-width: 600px;
+            margin: auto;
+        }
+        textarea {
+            width: 100%;
+            padding: 10px;
+            border-radius: 4px;
+            border: 1px solid #ccc;
+            resize: none;
+            margin-bottom: 10px;
+            font-size: 16px;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 10px 15px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        #results {
+            margin-top: 20px;
+            padding: 10px;
+            border-radius: 4px;
+            background: #ffffff;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        .result-item {
+            padding: 10px;
+            border-radius: 4px;
+            margin: 5px 0;
+            display: flex;
+            justify-content: space-between;
+        }
+        .valid {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        .invalid {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+        .error {
+            background-color: #fff3cd;
+            color: #856404;
+        }
+        #loading {
+            display: none;
+            text-align: center;
+            font-weight: bold;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
 
+<h1>Verificador de Links Personalizados</h1>
+<form id="linkForm">
+    <label for="linksInput">Cole seus links aqui:</label><br>
+    <textarea id="linksInput" rows="10" placeholder="Cole os links aqui..."></textarea><br>
+    <button type="button" id="checkLinksBtn">Checkar</button>
+</form>
+
+<div id="loading">Verificando...</div>
+<div id="results"></div>
+
+<script>
+    const TOKENS = [
+        'TOKEN_1',
+        'TOKEN_2'
+    ];
+    const PROXY_URL = 'http://20.206.106.192:8123';
+    let validLinks = [];
+
+    function getToken() {
+        const token = TOKENS.shift();
+        TOKENS.push(token);
+        return token;
+    }
+
+    async function checkLink(link) {
+        const apiUrl = `https://discord.com/api/v9/entitlements/gift-codes/${link.split('/').pop()}?with_application=false&with_subscription_plan=true`;
+        const token = getToken();
+
+        const options = {
+            method: 'GET',
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        };
+
+        try {
+            const response = await fetch(apiUrl, options);
+            if (response.ok) {
+                const data = await response.json();
+                let validity = '';
+
+                if (!data.redeemed && data.uses === 0) {
+                    const now = new Date();
+                    const expiresAt = new Date(data.expires_at);
+                    validity = (expiresAt > now) ? 'válido, expira em ' + expiresAt.toLocaleString() : 'válido, mas expirou em ' + expiresAt.toLocaleString();
+                } else {
+                    validity = 'inválido';
+                }
+
+                return { validity };
+            } else {
+                return { validity: 'inválido' };
+            }
+        } catch (error) {
+            console.error('Erro ao verificar o link:', error);
+            return { validity: 'inválido' };
+        }
+    }
+
+    document.getElementById('checkLinksBtn').addEventListener('click', async function() {
+        const linksInput = document.getElementById('linksInput');
+        const results = document.getElementById('results');
+        const loading = document.getElementById('loading');
+        results.innerHTML = '';
+        validLinks = [];
+
+        const links = linksInput.value.match(/https:\/\/(?:discord\.com\/billing\/promotions|promos\.discord\.gg)\/[^\s]+/g) || [];
+        if (links.length === 0) {
+            results.innerHTML = '<p>Nenhum link de promoção do Discord encontrado.</p>';
+            return;
+        }
+
+        loading.style.display = 'block';
+
+        for (const link of links) {
+            const { validity } = await checkLink(link);
+            let statusClass = validity === 'inválido' ? 'invalid' : 'valid';
+            if (statusClass === 'valid') validLinks.push(link);
+
+            const item = document.createElement('div');
+            item.classList.add('result-item', statusClass);
+            item.innerHTML = `${link} - ${validity}`;
+            results.appendChild(item);
+        }
+
+        loading.style.display = 'none';
+    });
+</script>
+
+</body>
+  </html>
